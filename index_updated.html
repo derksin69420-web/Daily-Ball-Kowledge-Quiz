@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ball Knowledge Daily</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface-2: #1a1a26;
+    --border: #2a2a3d;
+    --text: #f0f0f8;
+    --muted: #8b8ba7;
+    --accent: #00e5a0;
+    --accent-2: #00c4ff;
+    --good: #00e5a0;
+    --bad: #ff5b5b;
+    --gold: #ffd700;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(circle at top left, rgba(0,229,160,.08), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(0,196,255,.08), transparent 28%),
+      var(--bg);
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), rgba(255,255,255,.018) calc(10% - 1px), rgba(255,255,255,.018) 10%);
+    opacity: .65;
+  }
+  #app { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 20px 16px 56px; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom: 16px; }
+  .logo { font-family:'Bebas Neue', sans-serif; font-size: 2.45rem; line-height: .92; letter-spacing: 2px; }
+  .logo .gradient { background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip:text; background-clip:text; color: transparent; }
+  .tagline { color: var(--muted); font-size: .86rem; letter-spacing: 1px; text-transform: uppercase; margin-top: 6px; }
+  .pill { background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; min-width: 86px; text-align: center; }
+  .pill .num { font-family:'Bebas Neue', sans-serif; font-size: 1.8rem; line-height: 1; color: var(--gold); }
+  .pill .label { font-size: .68rem; text-transform: uppercase; letter-spacing: 1.6px; color: var(--muted); }
+  .datebar, .meta-row, .small-note { color: var(--muted); }
+  .datebar { display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border); padding-bottom:16px; margin-bottom:20px; font-size:.8rem; text-transform:uppercase; letter-spacing:1px; }
+  .datebar::before { content:""; width:7px; height:7px; border-radius:50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .card { background: var(--surface); border:1px solid var(--border); border-radius: 20px; padding: 24px; box-shadow: 0 14px 34px rgba(0,0,0,.18); }
+  .hero { text-align:center; padding: 34px 24px; }
+  .hero h2 { margin: 0 0 8px; font-family:'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 2px; }
+  .hero p { margin: 0 auto 20px; max-width: 460px; color: var(--muted); line-height: 1.6; }
+  .button {
+    border: 0; border-radius: 14px; cursor:pointer; padding: 15px 18px;
+    font: inherit; font-weight: 700;
+    transition: transform .15s ease, opacity .15s ease, border-color .15s ease;
+  }
+  .button:hover { transform: translateY(-1px); }
+  .button:disabled { cursor:not-allowed; opacity:.45; transform:none; }
+  .button.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color:#081012; }
+  .button.secondary { background: var(--surface-2); color: var(--text); border:1px solid var(--border); }
+  .button.full { width:100%; }
+  .progress-meta { display:flex; justify-content:space-between; color: var(--muted); font-size:.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .progress-track { height: 5px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin-bottom: 20px; }
+  .progress-fill { height:100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .25s ease; }
+  .q-num { color: var(--accent); font-family:'Bebas Neue', sans-serif; letter-spacing: 2px; margin-bottom: 10px; font-size: .95rem; }
+  .q-text { font-size: 1.25rem; line-height:1.45; font-weight:700; margin-bottom: 16px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom: 20px; }
+  .chip { background: var(--surface-2); border:1px solid var(--border); color: var(--muted); padding: 6px 11px; border-radius: 999px; font-size:.78rem; font-weight:700; letter-spacing:.4px; }
+  .chip.hot { color: var(--accent); border-color: rgba(0,229,160,.28); background: rgba(0,229,160,.08); }
+  .answer-wrap { position: relative; }
+  .answer-input {
+    width: 100%; padding: 17px 16px; border-radius: 14px; border:2px solid var(--border);
+    background: #101019; color: var(--text); font: inherit; font-size: 1rem; font-weight: 600;
+    outline: none;
+  }
+  .answer-input:focus { border-color: rgba(0,229,160,.55); box-shadow: 0 0 0 3px rgba(0,229,160,.08); }
+  .answer-input.correct { border-color: var(--good); background: rgba(0,229,160,.07); }
+  .answer-input.wrong { border-color: var(--bad); background: rgba(255,91,91,.07); }
+  .autocomplete-list {
+    position:absolute; left:0; right:0; top: calc(100% + 8px);
+    background: #11131c; border:1px solid var(--border); border-radius: 14px;
+    overflow: hidden; box-shadow: 0 18px 40px rgba(0,0,0,.35); z-index: 10; display:none;
+  }
+  .autocomplete-list.show { display:block; }
+  .autocomplete-item {
+    padding: 12px 14px; border-top:1px solid rgba(255,255,255,.04); cursor:pointer;
+    display:flex; justify-content:space-between; gap:12px; align-items:center;
+  }
+  .autocomplete-item:first-child { border-top:0; }
+  .autocomplete-item:hover, .autocomplete-item.active { background: rgba(0,229,160,.08); }
+  .autocomplete-name { font-weight:700; }
+  .autocomplete-meta { color: var(--muted); font-size: .8rem; }
+  .controls { display:flex; gap:10px; margin-top: 14px; }
+  .feedback { display:none; margin-top: 14px; padding: 12px 14px; border-radius: 12px; font-weight: 700; }
+  .feedback.show { display:block; }
+  .feedback.good { background: rgba(0,229,160,.1); border:1px solid rgba(0,229,160,.3); color: var(--good); }
+  .feedback.bad { background: rgba(255,91,91,.09); border:1px solid rgba(255,91,91,.28); color: var(--bad); }
+  .helper { display:flex; justify-content:space-between; gap:12px; margin-top:8px; font-size:.78rem; color: var(--muted); }
+  .helper button { background:none; border:0; color: var(--muted); text-decoration: underline; cursor:pointer; }
+  .results { text-align:center; }
+  .tier { color: var(--muted); text-transform:uppercase; letter-spacing:2px; font-size:.75rem; }
+  .score-big { font-family:'Bebas Neue', sans-serif; font-size: 5.5rem; line-height: 1; margin: 8px 0; }
+  .score-big span { font-size: 2rem; color: var(--muted); }
+  .results h2 { margin: 0; font-family:'Bebas Neue', sans-serif; font-size: 2.1rem; letter-spacing:2px; }
+  .review-list { margin-top: 18px; display:flex; flex-direction:column; gap:10px; text-align:left; }
+  .review-item { background: var(--surface); border:1px solid var(--border); border-left: 4px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+  .review-item.good { border-left-color: var(--good); }
+  .review-item.bad { border-left-color: var(--bad); }
+  .review-question { font-weight:700; margin-bottom: 6px; }
+  .review-answer { color: var(--muted); font-size: .9rem; }
+  .review-answer .right { color: var(--good); font-weight:700; }
+  .review-answer .wrong { color: var(--bad); font-weight:700; }
+  .stack { display:flex; flex-direction:column; gap:16px; }
+  .error { color: #ffd2d2; background: rgba(255,91,91,.08); border:1px solid rgba(255,91,91,.25); }
+  .roster-note { margin-top: 16px; text-align: center; color: var(--muted); font-size: .78rem; }
+  @media (max-width: 560px) {
+    .header { align-items: stretch; }
+    .logo { font-size: 2rem; }
+    .controls { flex-direction: column; }
+    .button { width: 100%; }
+    .score-big { font-size: 4.4rem; }
+  }
+</style>
+</head>
+<body>
+  <div id="app"><div class="card hero"><h2>Loading roster…</h2></div></div>
+
+<script>
+const TEAM_META = {
+  ARI:{name:'Arizona Cardinals',conference:'NFC',division:'NFC West'}, ATL:{name:'Atlanta Falcons',conference:'NFC',division:'NFC South'},
+  BAL:{name:'Baltimore Ravens',conference:'AFC',division:'AFC North'}, BUF:{name:'Buffalo Bills',conference:'AFC',division:'AFC East'},
+  CAR:{name:'Carolina Panthers',conference:'NFC',division:'NFC South'}, CHI:{name:'Chicago Bears',conference:'NFC',division:'NFC North'},
+  CIN:{name:'Cincinnati Bengals',conference:'AFC',division:'AFC North'}, CLE:{name:'Cleveland Browns',conference:'AFC',division:'AFC North'},
+  DAL:{name:'Dallas Cowboys',conference:'NFC',division:'NFC East'}, DEN:{name:'Denver Broncos',conference:'AFC',division:'AFC West'},
+  DET:{name:'Detroit Lions',conference:'NFC',division:'NFC North'}, GB:{name:'Green Bay Packers',conference:'NFC',division:'NFC North'},
+  HOU:{name:'Houston Texans',conference:'AFC',division:'AFC South'}, IND:{name:'Indianapolis Colts',conference:'AFC',division:'AFC South'},
+  JAX:{name:'Jacksonville Jaguars',conference:'AFC',division:'AFC South'}, KC:{name:'Kansas City Chiefs',conference:'AFC',division:'AFC West'},
+  LAC:{name:'Los Angeles Chargers',conference:'AFC',division:'AFC West'}, LAR:{name:'Los Angeles Rams',conference:'NFC',division:'NFC West'},
+  LV:{name:'Las Vegas Raiders',conference:'AFC',division:'AFC West'}, MIA:{name:'Miami Dolphins',conference:'AFC',division:'AFC East'},
+  MIN:{name:'Minnesota Vikings',conference:'NFC',division:'NFC North'}, NE:{name:'New England Patriots',conference:'AFC',division:'AFC East'},
+  NO:{name:'New Orleans Saints',conference:'NFC',division:'NFC South'}, NYG:{name:'New York Giants',conference:'NFC',division:'NFC East'},
+  NYJ:{name:'New York Jets',conference:'AFC',division:'AFC East'}, PHI:{name:'Philadelphia Eagles',conference:'NFC',division:'NFC East'},
+  PIT:{name:'Pittsburgh Steelers',conference:'AFC',division:'AFC North'}, SF:{name:'San Francisco 49ers',conference:'NFC',division:'NFC West'},
+  SEA:{name:'Seattle Seahawks',conference:'NFC',division:'NFC West'}, TB:{name:'Tampa Bay Buccaneers',conference:'NFC',division:'NFC South'},
+  TEN:{name:'Tennessee Titans',conference:'AFC',division:'AFC South'}, WAS:{name:'Washington Commanders',conference:'NFC',division:'NFC East'}
+};
+const POSITION_NAMES = {QB:'quarterback',RB:'running back',WR:'wide receiver',TE:'tight end',LB:'linebacker',CB:'cornerback',S:'safety',DE:'defensive end',DT:'defensive tackle',OT:'offensive tackle',OG:'offensive guard',C:'center',K:'kicker',P:'punter'};
+const STORAGE_PREFIX = 'bkdaily_v2';
+
+let rosterUpdated = '';
+let PLAYERS = [];
+let quiz = [];
+let currentIndex = 0;
+let score = 0;
+let answers = [];
+let selectedSuggestionIndex = -1;
+let activeSuggestions = [];
+
+const todayKey = getLocalDateKey();
+const dayStorageKey = `${STORAGE_PREFIX}_${todayKey}`;
+const streakStorageKey = `${STORAGE_PREFIX}_streak`;
+const historyStorageKey = `${STORAGE_PREFIX}_history`;
+
+function getLocalDateKey() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,'0');
+  const d = String(now.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+function formatPrettyDate(key) {
+  const [y,m,d] = key.split('-').map(Number);
+  return new Date(y, m-1, d).toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+}
+function getPrevDateKey(key) {
+  const [y,m,d] = key.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate() - 1);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function seededRNG(seed) {
+  let s = seed >>> 0;
+  return function() {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+function hashString(str) {
+  let h = 2166136261;
+  for (let i=0;i<str.length;i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function shuffle(arr, rng) {
+  const a = arr.slice();
+  for (let i=a.length-1;i>0;i--) {
+    const j = Math.floor(rng() * (i+1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function uniqueBy(arr, keyFn) {
+  const seen = new Set();
+  return arr.filter(item => {
+    const key = keyFn(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+function normalizeName(str) {
+  return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+function positionLabel(code) {
+  return POSITION_NAMES[code] || code;
+}
+function parseRoster(payload) {
+  const players = (payload.players || []).map(p => {
+    const meta = TEAM_META[p.t] || {name:p.t, conference:'', division:''};
+    return {
+      id: `${p.n}|${p.t}|${p.p}|${p.j}`,
+      name: p.n,
+      teamCode: p.t,
+      team: meta.name,
+      conference: meta.conference,
+      division: meta.division,
+      position: p.p,
+      number: String(p.j ?? ''),
+      college: p.c || 'Unknown',
+      age: Number(p.a || 0),
+      exp: Number(p.e || 0)
+    };
+  });
+  const cleaned = uniqueBy(players.filter(p => p.name && p.teamCode && p.position), p => p.id);
+  return cleaned;
+}
+function exactMatches(predicate) { return PLAYERS.filter(predicate); }
+function uniqueMatch(predicate) {
+  const hits = exactMatches(predicate);
+  return hits.length === 1 ? hits[0] : null;
+}
+function rosterPool() {
+  return PLAYERS.filter(p => ['QB','RB','WR','TE','CB','S','LB','DE','DT'].includes(p.position));
+}
+function buildQuestionFromTemplate(player, template, rng) {
+  try { return template(player, rng); } catch { return null; }
+}
+
+const TEMPLATES = [
+  (p, rng) => {
+    const hit = uniqueMatch(x => x.division===p.division && x.position===p.position && x.number===p.number);
+    if (!hit || hit.id !== p.id) return null;
+    return makeQuestion(`Which ${p.division} ${positionLabel(p.position)} wears #${p.number}?`, [p.division, p.position, `#${p.number}`], p, rng, ['position', 'division']);
+  },
+  (p, rng) => {
+    const hit = uniqueMatch(x => x.team===p.team && x.position===p.position && x.number===p.number);
+    if (!hit || hit.id !== p.id) return null;
+    return makeQuestion(`Which ${p.team} ${positionLabel(p.position)} wears #${p.number}?`, [p.teamCode, p.position, `#${p.number}`], p, rng, ['position', 'teamCode']);
+  },
+  (p, rng) => {
+    if (!p.college || p.college === 'Unknown') return null;
+    const hit = uniqueMatch(x => x.conference===p.conference && x.position===p.position && x.college===p.college);
+    if (!hit || hit.id !== p.id) return null;
+    return makeQuestion(`Which ${p.conference} ${positionLabel(p.position)} played at ${p.college}?`, [p.conference, p.position, p.college], p, rng, ['position', 'conference']);
+  },
+  (p, rng) => {
+    if (!p.college || p.college === 'Unknown') return null;
+    const hit = uniqueMatch(x => x.division===p.division && x.position===p.position && x.college===p.college);
+    if (!hit || hit.id !== p.id) return null;
+    return makeQuestion(`Which ${p.division} ${positionLabel(p.position)} played at ${p.college}?`, [p.division, p.position, p.college], p, rng, ['position', 'division']);
+  },
+  (p, rng) => {
+    if (!p.college || p.college === 'Unknown') return null;
+    const hit = uniqueMatch(x => x.conference===p.conference && x.position===p.position && x.number===p.number && x.college===p.college);
+    if (!hit || hit.id !== p.id) return null;
+    return makeQuestion(`Which player fits this profile: ${p.conference}, ${p.position}, #${p.number}, ${p.college}?`, [p.conference, p.position, `#${p.number}`, p.college], p, rng, ['position', 'conference']);
+  },
+  (p, rng) => {
+    if (p.exp < 2) return null;
+    const hit = uniqueMatch(x => x.division===p.division && x.position===p.position && x.exp===p.exp);
+    if (!hit || hit.id !== p.id) return null;
+    return makeQuestion(`Which ${p.division} ${positionLabel(p.position)} has ${p.exp} years of experience?`, [p.division, p.position, `${p.exp} yrs`], p, rng, ['position', 'division']);
+  },
+  (p, rng) => {
+    const hit = uniqueMatch(x => x.team===p.team && x.position===p.position && x.college===p.college && x.college !== 'Unknown');
+    if (!hit || hit.id !== p.id) return null;
+    return makeQuestion(`Which ${p.team} ${positionLabel(p.position)} went to ${p.college}?`, [p.teamCode, p.position, p.college], p, rng, ['position', 'teamCode']);
+  },
+  (p, rng) => {
+    const hit = uniqueMatch(x => x.conference===p.conference && x.position===p.position && x.number===p.number);
+    if (!hit || hit.id !== p.id) return null;
+    return makeQuestion(`Which ${p.conference} ${positionLabel(p.position)} wears #${p.number}?`, [p.conference, p.position, `#${p.number}`], p, rng, ['position', 'conference']);
+  }
+];
+
+function makeQuestion(text, chips, answerPlayer, rng, preferKeys) {
+  const options = shuffle([answerPlayer.name, ...buildDistractors(answerPlayer, rng, preferKeys)], rng);
+  return {
+    id: hashString(`${text}|${answerPlayer.id}`),
+    text,
+    chips,
+    answer: answerPlayer.name,
+    answerNorm: normalizeName(answerPlayer.name),
+    teamCode: answerPlayer.teamCode,
+    position: answerPlayer.position,
+    options
+  };
+}
+function buildDistractors(answerPlayer, rng, preferKeys=[]) {
+  let pool = PLAYERS.filter(p => p.id !== answerPlayer.id);
+  for (const key of preferKeys) {
+    const narrowed = pool.filter(p => p[key] === answerPlayer[key]);
+    if (narrowed.length >= 3) pool = narrowed;
+  }
+  if (pool.length < 3) {
+    pool = PLAYERS.filter(p => p.id !== answerPlayer.id && p.position === answerPlayer.position);
+  }
+  if (pool.length < 3) {
+    pool = PLAYERS.filter(p => p.id !== answerPlayer.id);
+  }
+  const picked = [];
+  for (const p of shuffle(pool, rng)) {
+    if (!picked.some(x => x.name === p.name)) picked.push(p);
+    if (picked.length === 3) break;
+  }
+  return picked.map(p => p.name);
+}
+function generateDailyQuiz(dateKey) {
+  const rng = seededRNG(hashString(dateKey + '|' + (rosterUpdated || 'none')));
+  const candidates = shuffle(rosterPool(), rng);
+  const templates = shuffle(TEMPLATES, rng);
+  const usedPlayers = new Set();
+  const usedTexts = new Set();
+  const built = [];
+  let tries = 0;
+  while (built.length < 10 && tries < 5000) {
+    tries += 1;
+    const player = candidates[Math.floor(rng() * candidates.length)];
+    const template = templates[Math.floor(rng() * templates.length)];
+    if (!player || usedPlayers.has(player.id)) continue;
+    const q = buildQuestionFromTemplate(player, template, rng);
+    if (!q || usedTexts.has(q.text)) continue;
+    built.push(q);
+    usedPlayers.add(player.id);
+    usedTexts.add(q.text);
+  }
+  if (built.length < 10) {
+    throw new Error('Could not generate 10 unique questions from current roster data.');
+  }
+  return built;
+}
+function getSavedDayState() {
+  try { return JSON.parse(localStorage.getItem(dayStorageKey)); } catch { return null; }
+}
+function saveDayState(state) {
+  localStorage.setItem(dayStorageKey, JSON.stringify(state));
+}
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(historyStorageKey)) || []; } catch { return []; }
+}
+function saveHistory(entry) {
+  const history = getHistory().filter(x => x.date !== entry.date);
+  history.unshift(entry);
+  localStorage.setItem(historyStorageKey, JSON.stringify(history.slice(0, 30)));
+}
+function getStreak() {
+  try { return JSON.parse(localStorage.getItem(streakStorageKey)) || {count:0,lastCompleted:''}; } catch { return {count:0,lastCompleted:''}; }
+}
+function updateStreakOnComplete() {
+  const streak = getStreak();
+  if (streak.lastCompleted === todayKey) return streak;
+  const prev = getPrevDateKey(todayKey);
+  streak.count = streak.lastCompleted === prev ? streak.count + 1 : 1;
+  streak.lastCompleted = todayKey;
+  localStorage.setItem(streakStorageKey, JSON.stringify(streak));
+  return streak;
+}
+function scoreLabel(scoreValue) {
+  if (scoreValue === 10) return 'Certified Ball Knower';
+  if (scoreValue >= 8) return 'Knows Ball';
+  if (scoreValue >= 6) return 'Solid Tape Watcher';
+  if (scoreValue >= 4) return 'Casual';
+  return 'Watch More Tape';
+}
+function shareText() {
+  return `Ball Knowledge Daily ${todayKey}\n${score}/10 — ${scoreLabel(score)}${getStreak().count ? `\nStreak: ${getStreak().count}` : ''}`;
+}
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderShell(content) {
+  const streak = getStreak();
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div>
+        <div class="logo"><span class="gradient">BALL KNOWLEDGE</span><br>DAILY</div>
+        <div class="tagline">10-question NFL daily test</div>
+      </div>
+      <div class="pill">
+        <div class="num">${streak.count}</div>
+        <div class="label">Streak</div>
+      </div>
+    </div>
+    <div class="datebar">${formatPrettyDate(todayKey)}</div>
+    ${content}
+    <div class="roster-note">Roster updated: ${escapeHtml(rosterUpdated || 'unknown')}</div>
+  `;
+}
+function renderStart(saved) {
+  if (saved && saved.completed) {
+    score = saved.score;
+    answers = saved.answers;
+    renderResults(true);
+    return;
+  }
+  renderShell(`
+    <div class="card hero">
+      <h2>Today’s Ball Knowledge Test</h2>
+      <p>Ten clue-based NFL player questions. Type the player name, use auto-complete, lock in your answer, and see if you really know ball.</p>
+      <button class="button primary" id="startBtn">Start Today’s Quiz</button>
+    </div>
+  `);
+  document.getElementById('startBtn').onclick = () => {
+    currentIndex = 0;
+    score = 0;
+    answers = [];
+    renderQuestion();
+  };
+}
+function renderQuestion() {
+  const q = quiz[currentIndex];
+  const progress = ((currentIndex) / quiz.length) * 100;
+  renderShell(`
+    <div class="progress-meta"><span>Question ${currentIndex + 1} of ${quiz.length}</span><span>Score ${score}</span></div>
+    <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
+    <div class="card">
+      <div class="q-num">DAILY QUESTION ${currentIndex + 1}</div>
+      <div class="q-text">${escapeHtml(q.text)}</div>
+      <div class="chips">${q.chips.map((chip, i) => `<span class="chip ${i===0 ? 'hot' : ''}">${escapeHtml(chip)}</span>`).join('')}</div>
+      <div class="answer-wrap">
+        <input id="answerInput" class="answer-input" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Type a player name" />
+        <div id="autocompleteList" class="autocomplete-list"></div>
+      </div>
+      <div class="helper"><span>Start typing and tap a suggestion.</span><button id="skipBtn" type="button">Skip</button></div>
+      <div class="controls">
+        <button id="submitBtn" class="button primary" disabled>Lock Answer</button>
+        <button id="clearBtn" class="button secondary">Clear</button>
+      </div>
+      <div id="feedback" class="feedback"></div>
+      <button id="nextBtn" class="button primary full" style="display:none; margin-top:14px;">${currentIndex === quiz.length - 1 ? 'See Results' : 'Next Question'}</button>
+    </div>
+  `);
+
+  const input = document.getElementById('answerInput');
+  const submitBtn = document.getElementById('submitBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const feedback = document.getElementById('feedback');
+  const list = document.getElementById('autocompleteList');
+  let locked = false;
+
+  function hideSuggestions() {
+    activeSuggestions = [];
+    selectedSuggestionIndex = -1;
+    list.classList.remove('show');
+    list.innerHTML = '';
+  }
+  function updateSubmitState() {
+    submitBtn.disabled = !input.value.trim() || locked;
+  }
+  function setInputFromSuggestion(name) {
+    input.value = name;
+    hideSuggestions();
+    updateSubmitState();
+    input.focus();
+  }
+  function renderSuggestions(matches) {
+    activeSuggestions = matches;
+    selectedSuggestionIndex = -1;
+    if (!matches.length || locked) {
+      hideSuggestions();
+      return;
+    }
+    list.innerHTML = matches.map((p, idx) => `
+      <div class="autocomplete-item" data-idx="${idx}">
+        <div>
+          <div class="autocomplete-name">${escapeHtml(p.name)}</div>
+          <div class="autocomplete-meta">${escapeHtml(p.teamCode)} · ${escapeHtml(p.position)} · #${escapeHtml(p.number)}</div>
+        </div>
+      </div>
+    `).join('');
+    list.classList.add('show');
+    list.querySelectorAll('.autocomplete-item').forEach(el => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const idx = Number(el.dataset.idx);
+        setInputFromSuggestion(matches[idx].name);
+      });
+    });
+  }
+  function getSuggestions(value) {
+    const qv = normalizeName(value);
+    if (!qv) return [];
+    return PLAYERS
+      .filter(p => normalizeName(p.name).includes(qv))
+      .sort((a,b) => {
+        const an = normalizeName(a.name);
+        const bn = normalizeName(b.name);
+        const aStarts = an.startsWith(qv) ? 0 : 1;
+        const bStarts = bn.startsWith(qv) ? 0 : 1;
+        if (aStarts !== bStarts) return aStarts - bStarts;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 6);
+  }
+  function markAnswer(correct, playerName) {
+    locked = true;
+    hideSuggestions();
+    input.disabled = true;
+    submitBtn.disabled = true;
+    clearBtn.disabled = true;
+    input.classList.remove('correct','wrong');
+    input.classList.add(correct ? 'correct' : 'wrong');
+    feedback.className = `feedback show ${correct ? 'good' : 'bad'}`;
+    feedback.textContent = correct ? `Correct — ${q.answer}` : `Wrong — correct answer: ${q.answer}`;
+    nextBtn.style.display = 'block';
+    answers.push({
+      question: q.text,
+      answer: q.answer,
+      guess: playerName || '',
+      correct
+    });
+    if (correct) score += 1;
+  }
+  function submitCurrent(skip=false) {
+    if (locked) return;
+    const value = skip ? '' : input.value.trim();
+    if (!value && !skip) return;
+    const correct = normalizeName(value) === q.answerNorm;
+    markAnswer(correct, value);
+  }
+
+  input.addEventListener('input', () => {
+    if (locked) return;
+    renderSuggestions(getSuggestions(input.value));
+    updateSubmitState();
+  });
+  input.addEventListener('keydown', (e) => {
+    if (locked) return;
+    if (e.key === 'ArrowDown' && activeSuggestions.length) {
+      e.preventDefault();
+      selectedSuggestionIndex = (selectedSuggestionIndex + 1) % activeSuggestions.length;
+    } else if (e.key === 'ArrowUp' && activeSuggestions.length) {
+      e.preventDefault();
+      selectedSuggestionIndex = (selectedSuggestionIndex - 1 + activeSuggestions.length) % activeSuggestions.length;
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeSuggestions.length && selectedSuggestionIndex >= 0) {
+        setInputFromSuggestion(activeSuggestions[selectedSuggestionIndex].name);
+      } else {
+        submitCurrent(false);
+      }
+      return;
+    } else if (e.key === 'Escape') {
+      hideSuggestions();
+      return;
+    } else {
+      return;
+    }
+    list.querySelectorAll('.autocomplete-item').forEach((el, idx) => el.classList.toggle('active', idx === selectedSuggestionIndex));
+    if (selectedSuggestionIndex >= 0) {
+      const choice = activeSuggestions[selectedSuggestionIndex];
+      input.value = choice.name;
+      updateSubmitState();
+    }
+  });
+  input.addEventListener('blur', () => setTimeout(hideSuggestions, 120));
+  submitBtn.onclick = () => submitCurrent(false);
+  clearBtn.onclick = () => { if (!locked) { input.value = ''; hideSuggestions(); updateSubmitState(); input.focus(); } };
+  document.getElementById('skipBtn').onclick = () => submitCurrent(true);
+  nextBtn.onclick = () => {
+    if (currentIndex < quiz.length - 1) {
+      currentIndex += 1;
+      renderQuestion();
+    } else {
+      completeQuiz();
+    }
+  };
+  updateSubmitState();
+  input.focus();
+}
+function completeQuiz() {
+  const streak = updateStreakOnComplete();
+  const payload = { completed: true, date: todayKey, score, answers, streak: streak.count };
+  saveDayState(payload);
+  saveHistory({ date: todayKey, score });
+  renderResults(false);
+}
+function renderResults(alreadyDone) {
+  const label = scoreLabel(score);
+  renderShell(`
+    <div class="card results">
+      <div class="tier">${alreadyDone ? 'Already completed today' : 'Daily result'}</div>
+      <h2>${escapeHtml(label)}</h2>
+      <div class="score-big">${score}<span>/10</span></div>
+      <div class="small-note">${alreadyDone ? 'Come back tomorrow for a new test.' : 'Locked in for today. Build the streak tomorrow.'}</div>
+      <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+        <button id="shareBtn" class="button secondary">Copy Result</button>
+        <button id="reviewBtn" class="button primary">Review Answers</button>
+      </div>
+    </div>
+    <div id="reviewMount"></div>
+  `);
+  document.getElementById('shareBtn').onclick = async () => {
+    const txt = shareText();
+    try { await navigator.clipboard.writeText(txt); } catch {}
+    document.getElementById('shareBtn').textContent = 'Copied';
+  };
+  document.getElementById('reviewBtn').onclick = () => {
+    const mount = document.getElementById('reviewMount');
+    mount.innerHTML = `
+      <div class="review-list">
+        ${answers.map(a => `
+          <div class="review-item ${a.correct ? 'good' : 'bad'}">
+            <div class="review-question">${escapeHtml(a.question)}</div>
+            <div class="review-answer">
+              ${a.correct ? `You got it: <span class="right">${escapeHtml(a.answer)}</span>` : `Your answer: <span class="wrong">${escapeHtml(a.guess || 'Skipped')}</span><br>Correct answer: <span class="right">${escapeHtml(a.answer)}</span>`}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    document.getElementById('reviewBtn').remove();
+  };
+}
+function renderError(message) {
+  renderShell(`
+    <div class="card hero error">
+      <h2>Couldn’t load today’s test</h2>
+      <p>${escapeHtml(message)}</p>
+    </div>
+  `);
+}
+async function init() {
+  try {
+    const res = await fetch('./roster.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('roster.json could not be loaded.');
+    const payload = await res.json();
+    rosterUpdated = payload.updated || 'unknown';
+    PLAYERS = parseRoster(payload);
+    if (PLAYERS.length < 200) throw new Error('Roster data is incomplete.');
+    quiz = generateDailyQuiz(todayKey);
+    const saved = getSavedDayState();
+    renderStart(saved);
+  } catch (err) {
+    renderError(err.message || 'Unknown error');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
