@@ -1,0 +1,94 @@
+name: Update NFL Rosters
+
+on:
+schedule:
+# Runs every day at 10:00 UTC
+- cron: "0 10 * * *"
+workflow_dispatch:
+
+permissions:
+contents: write
+
+jobs:
+update-rosters:
+runs-on: ubuntu-latest
+
+```
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+
+  - name: Fetch ESPN rosters and rebuild roster.json
+    run: |
+      node <<'EOF'
+      const fs = require("fs");
+      const https = require("https");
+
+      const teams = [
+        1,2,3,4,5,6,7,8,
+        9,10,11,12,13,14,15,16,
+        17,18,19,20,21,22,23,24,
+        25,26,27,28,29,30,33,34
+      ];
+
+      function fetch(url) {
+        return new Promise((resolve, reject) => {
+          https.get(url, res => {
+            let data = "";
+            res.on("data", chunk => data += chunk);
+            res.on("end", () => resolve(JSON.parse(data)));
+          }).on("error", reject);
+        });
+      }
+
+      async function main() {
+        const players = [];
+
+        for (const id of teams) {
+          const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/roster`;
+          const data = await fetch(url);
+
+          if (!data.team || !data.athletes) continue;
+
+          const teamName = data.team.displayName;
+          const conference = data.team.groups?.parent?.name || "";
+          const division = data.team.groups?.name || "";
+
+          data.athletes.forEach(group => {
+            group.items.forEach(p => {
+              players.push({
+                name: p.displayName,
+                team: teamName,
+                position: p.position?.abbreviation || "",
+                number: Number(p.jersey) || 0,
+                college: p.college?.name || "",
+                exp: Number(p.experience?.years) || 0,
+                height: p.height ? Number(p.height.split("-")[0])*12 + Number(p.height.split("-")[1]) : 0,
+                weight: Number(p.weight) || 0,
+                conference,
+                division
+              });
+            });
+          });
+        }
+
+        const output = {
+          updated: new Date().toISOString(),
+          players
+        };
+
+        fs.writeFileSync("roster.json", JSON.stringify(output, null, 2));
+        console.log(`Saved ${players.length} players`);
+      }
+
+      main();
+      EOF
+
+  - name: Commit updated roster
+    run: |
+      git config user.name "github-actions"
+      git config user.email "actions@github.com"
+      git add roster.json
+      git commit -m "Auto-update NFL rosters" || echo "No changes"
+      git push
+```
