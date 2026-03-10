@@ -1,93 +1,135 @@
 name: Update NFL Rosters
 
 on:
-schedule:
-# Runs every day at 10:00 UTC
-- cron: "0 10 * * *"
-workflow_dispatch:
+  schedule:
+    # Runs every day at 10:00 UTC
+    - cron: "0 10 * * *"
+  workflow_dispatch:
 
 permissions:
-contents: write
+  contents: write
 
 jobs:
-update-rosters:
-runs-on: ubuntu-latest
+  update-rosters:
+    runs-on: ubuntu-latest
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Fetch ESPN rosters and rebuild roster.json
-    run: |
-      node <<'EOF'
-      const fs = require("fs");
-      const https = require("https");
+      - name: Fetch ESPN rosters and rebuild roster.json
+        run: |
+          node <<'EOF'
+          const fs = require("fs");
+          const https = require("https");
 
-      const teams = [
-        1,2,3,4,5,6,7,8,
-        9,10,11,12,13,14,15,16,
-        17,18,19,20,21,22,23,24,
-        25,26,27,28,29,30,33,34
-      ];
+          const teams = [
+            1,2,3,4,5,6,7,8,
+            9,10,11,12,13,14,15,16,
+            17,18,19,20,21,22,23,24,
+            25,26,27,28,29,30,33,34
+          ];
 
-      function fetch(url) {
-        return new Promise((resolve, reject) => {
-          https.get(url, res => {
-            let data = "";
-            res.on("data", chunk => data += chunk);
-            res.on("end", () => resolve(JSON.parse(data)));
-          }).on("error", reject);
-        });
-      }
+          // Only keep players at these positions
+          const SKILL_POSITIONS = new Set(["QB", "RB", "WR", "TE"]);
 
-      async function main() {
-        const players = [];
+          // Only keep players with these active statuses
+          const ACTIVE_STATUSES = new Set(["Active", "Day-To-Day", "Questionable", "Doubtful"]);
 
-        for (const id of teams) {
-          const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/roster`;
-          const data = await fetch(url);
-
-          if (!data.team || !data.athletes) continue;
-
-          const teamName = data.team.displayName;
-          const conference = data.team.groups?.parent?.name || "";
-          const division = data.team.groups?.name || "";
-
-          data.athletes.forEach(group => {
-            group.items.forEach(p => {
-              players.push({
-                name: p.displayName,
-                team: teamName,
-                position: p.position?.abbreviation || "",
-                number: Number(p.jersey) || 0,
-                college: p.college?.name || "",
-                exp: Number(p.experience?.years) || 0,
-                height: p.height ? Number(p.height.split("-")[0])*12 + Number(p.height.split("-")[1]) : 0,
-                weight: Number(p.weight) || 0,
-                conference,
-                division
-              });
+          function fetch(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = "";
+                res.on("data", chunk => data += chunk);
+                res.on("end", () => {
+                  try { resolve(JSON.parse(data)); }
+                  catch(e) { reject(e); }
+                });
+              }).on("error", reject);
             });
-          });
-        }
+          }
 
-        const output = {
-          updated: new Date().toISOString(),
-          players
-        };
+          // Map full team name to 3-letter abbreviation
+          const ABBR_MAP = {
+            "Arizona Cardinals":"ARI","Atlanta Falcons":"ATL","Baltimore Ravens":"BAL",
+            "Buffalo Bills":"BUF","Carolina Panthers":"CAR","Chicago Bears":"CHI",
+            "Cincinnati Bengals":"CIN","Cleveland Browns":"CLE","Dallas Cowboys":"DAL",
+            "Denver Broncos":"DEN","Detroit Lions":"DET","Green Bay Packers":"GB",
+            "Houston Texans":"HOU","Indianapolis Colts":"IND","Jacksonville Jaguars":"JAX",
+            "Kansas City Chiefs":"KC","Las Vegas Raiders":"LV","Los Angeles Chargers":"LAC",
+            "Los Angeles Rams":"LAR","Miami Dolphins":"MIA","Minnesota Vikings":"MIN",
+            "New England Patriots":"NE","New Orleans Saints":"NO","New York Giants":"NYG",
+            "New York Jets":"NYJ","Philadelphia Eagles":"PHI","Pittsburgh Steelers":"PIT",
+            "San Francisco 49ers":"SF","Seattle Seahawks":"SEA","Tampa Bay Buccaneers":"TB",
+            "Tennessee Titans":"TEN","Washington Commanders":"WAS"
+          };
 
-        fs.writeFileSync("roster.json", JSON.stringify(output, null, 2));
-        console.log(`Saved ${players.length} players`);
-      }
+          async function main() {
+            const players = [];
+            const seen = new Set();
 
-      main();
-      EOF
+            for (const id of teams) {
+              const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/roster`;
+              let data;
+              try {
+                data = await fetch(url);
+              } catch(e) {
+                console.warn(`Failed to fetch team ${id}:`, e.message);
+                continue;
+              }
 
-  - name: Commit updated roster
-    run: |
-      git config user.name "github-actions"
-      git config user.email "actions@github.com"
-      git add roster.json
-      git commit -m "Auto-update NFL rosters" || echo "No changes"
-      git push
-```
+              if (!data.team || !data.athletes) continue;
+
+              const teamName = data.team.displayName;
+              const abbr = ABBR_MAP[teamName] || "";
+
+              data.athletes.forEach(group => {
+                group.items.forEach(p => {
+                  const pos = p.position?.abbreviation || "";
+
+                  // Skip non-skill positions
+                  if (!SKILL_POSITIONS.has(pos)) return;
+
+                  // Skip inactive/injured reserve/free agents
+                  const status = p.status?.type?.name || p.status?.name || "Active";
+                  if (!ACTIVE_STATUSES.has(status) && status !== "Active") return;
+
+                  // Skip if no jersey number (practice squad / unsigned)
+                  if (!p.jersey) return;
+
+                  // Deduplicate by name
+                  const name = p.displayName;
+                  if (seen.has(name)) return;
+                  seen.add(name);
+
+                  players.push({
+                    n: name,
+                    p: pos,
+                    j: p.jersey,
+                    t: abbr,
+                    c: p.college?.name || "",
+                    e: Number(p.experience?.years) || 0
+                  });
+                });
+              });
+            }
+
+            const output = {
+              updated: new Date().toISOString().slice(0, 10),
+              players
+            };
+
+            fs.writeFileSync("roster.json", JSON.stringify(output));
+            console.log(`Saved ${players.length} active skill-position players`);
+          }
+
+          main();
+          EOF
+
+      - name: Commit updated roster
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add roster.json
+          git commit -m "Auto-update NFL rosters" || echo "No changes"
+          git push
