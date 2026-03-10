@@ -17,39 +17,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Fetch ESPN rosters and rebuild roster.json
+      - name: Fetch ESPN game-day rosters and rebuild roster.json
         run: |
           node <<'EOF'
           const fs = require("fs");
           const https = require("https");
 
-          const teams = [
+          // All positions EXCEPT offensive line
+          const EXCLUDE_POSITIONS = new Set(["OT", "OG", "C", "OL", "G", "T", "LS"]);
+
+          const TEAM_IDS = [
             1,2,3,4,5,6,7,8,
             9,10,11,12,13,14,15,16,
             17,18,19,20,21,22,23,24,
             25,26,27,28,29,30,33,34
           ];
 
-          // Only keep players at these positions
-          const SKILL_POSITIONS = new Set(["QB", "RB", "WR", "TE"]);
-
-          // Only keep players with these active statuses
-          const ACTIVE_STATUSES = new Set(["Active", "Day-To-Day", "Questionable", "Doubtful"]);
-
-          function fetch(url) {
-            return new Promise((resolve, reject) => {
-              https.get(url, res => {
-                let data = "";
-                res.on("data", chunk => data += chunk);
-                res.on("end", () => {
-                  try { resolve(JSON.parse(data)); }
-                  catch(e) { reject(e); }
-                });
-              }).on("error", reject);
-            });
-          }
-
-          // Map full team name to 3-letter abbreviation
           const ABBR_MAP = {
             "Arizona Cardinals":"ARI","Atlanta Falcons":"ATL","Baltimore Ravens":"BAL",
             "Buffalo Bills":"BUF","Carolina Panthers":"CAR","Chicago Bears":"CHI",
@@ -64,54 +47,104 @@ jobs:
             "Tennessee Titans":"TEN","Washington Commanders":"WAS"
           };
 
+          function get(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = "";
+                res.on("data", chunk => data += chunk);
+                res.on("end", () => {
+                  try { resolve(JSON.parse(data)); }
+                  catch(e) { reject(new Error("JSON parse failed for " + url)); }
+                });
+              }).on("error", reject);
+            });
+          }
+
+          async function getLastGameId(teamId) {
+            const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${teamId}/schedule?season=2025&seasontype=2`;
+            const data = await get(url);
+            const events = data.events || [];
+            const completed = events.filter(e => e.competitions?.[0]?.status?.type?.completed);
+            if (!completed.length) return null;
+            return completed[completed.length - 1].id;
+          }
+
+          async function getGameRoster(gameId, teamId) {
+            const url = `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/${gameId}/competitions/${gameId}/competitors/${teamId}/roster?season=2025`;
+            const data = await get(url);
+            return data.entries || [];
+          }
+
           async function main() {
             const players = [];
             const seen = new Set();
 
-            for (const id of teams) {
-              const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/roster`;
-              let data;
+            for (const teamId of TEAM_IDS) {
+              console.log(`Processing team ${teamId}...`);
+
+              // Get team metadata
+              let teamName = "", abbr = "", conf = "", div = "";
               try {
-                data = await fetch(url);
+                const teamData = await get(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${teamId}`);
+                teamName = teamData.team?.displayName || "";
+                abbr = ABBR_MAP[teamName] || "";
+                conf = teamData.team?.groups?.parent?.name || "";
+                div = teamData.team?.groups?.name || "";
               } catch(e) {
-                console.warn(`Failed to fetch team ${id}:`, e.message);
-                continue;
+                console.warn(`Could not get team info for ${teamId}`);
               }
 
-              if (!data.team || !data.athletes) continue;
+              // Try game-day roster first
+              let useGameRoster = false;
+              let entries = [];
+              try {
+                const gameId = await getLastGameId(teamId);
+                if (gameId) {
+                  entries = await getGameRoster(gameId, teamId);
+                  useGameRoster = true;
+                  console.log(`  Got game-day roster (${entries.length} entries) for ${teamName}`);
+                }
+              } catch(e) {
+                console.warn(`  Game roster failed for ${teamName}, using current roster`);
+              }
 
-              const teamName = data.team.displayName;
-              const abbr = ABBR_MAP[teamName] || "";
-
-              data.athletes.forEach(group => {
-                group.items.forEach(p => {
-                  const pos = p.position?.abbreviation || "";
-
-                  // Skip non-skill positions
-                  if (!SKILL_POSITIONS.has(pos)) return;
-
-                  // Skip inactive/injured reserve/free agents
-                  const status = p.status?.type?.name || p.status?.name || "Active";
-                  if (!ACTIVE_STATUSES.has(status) && status !== "Active") return;
-
-                  // Skip if no jersey number (practice squad / unsigned)
-                  if (!p.jersey) return;
-
-                  // Deduplicate by name
-                  const name = p.displayName;
-                  if (seen.has(name)) return;
-                  seen.add(name);
-
-                  players.push({
-                    n: name,
-                    p: pos,
-                    j: p.jersey,
-                    t: abbr,
-                    c: p.college?.name || "",
-                    e: Number(p.experience?.years) || 0
+              if (useGameRoster && entries.length > 0) {
+                // Use game-day roster entries
+                for (const entry of entries) {
+                  try {
+                    const playerRef = entry.athlete?.$ref;
+                    if (!playerRef) continue;
+                    const p = await get(playerRef);
+                    const pos = p.position?.abbreviation || "";
+                    if (EXCLUDE_POSITIONS.has(pos)) continue;
+                    if (!p.jersey) continue;
+                    const name = p.displayName || p.fullName || "";
+                    if (!name || seen.has(name)) continue;
+                    seen.add(name);
+                    players.push({ n: name, p: pos, j: p.jersey, t: abbr, c: p.college?.name || "", e: Number(p.experience?.years) || 0, conf, div });
+                  } catch(e) { /* skip */ }
+                }
+              } else {
+                // Fallback: current team roster
+                try {
+                  const fallback = await get(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${teamId}/roster`);
+                  (fallback.athletes || []).forEach(group => {
+                    (group.items || []).forEach(p => {
+                      const pos = p.position?.abbreviation || "";
+                      if (EXCLUDE_POSITIONS.has(pos)) return;
+                      if (!p.jersey) return;
+                      const name = p.displayName;
+                      if (!name || seen.has(name)) return;
+                      seen.add(name);
+                      players.push({ n: name, p: pos, j: p.jersey, t: abbr, c: p.college?.name || "", e: Number(p.experience?.years) || 0, conf, div });
+                    });
                   });
-                });
-              });
+                } catch(e2) {
+                  console.warn(`  Fallback also failed for ${teamName}`);
+                }
+              }
+
+              await new Promise(r => setTimeout(r, 200));
             }
 
             const output = {
@@ -120,10 +153,10 @@ jobs:
             };
 
             fs.writeFileSync("roster.json", JSON.stringify(output));
-            console.log(`Saved ${players.length} active skill-position players`);
+            console.log(`Done. Saved ${players.length} players.`);
           }
 
-          main();
+          main().catch(console.error);
           EOF
 
       - name: Commit updated roster
@@ -131,5 +164,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add roster.json
-          git commit -m "Auto-update NFL rosters" || echo "No changes"
+          git commit -m "Auto-update NFL rosters from 2025 game-day data" || echo "No changes"
           git push
